@@ -41,6 +41,7 @@ import androidx.tv.material3.Text
 import dev.rtsearch.tv.AppController
 import dev.rtsearch.tv.UpdateState
 import dev.rtsearch.tv.data.SortOrder
+import dev.rtsearch.tv.data.summary
 import dev.rtsearch.tv.data.TorrentItem
 
 val Muted = Color(0xFF9AA7BB)
@@ -103,7 +104,7 @@ fun SearchScreen(c: AppController) {
             Spacer(Modifier.width(16.dp))
             OutlinedButton(onClick = { c.openCategories() }) {
                 Text(
-                    "Category: " + (c.filter?.label ?: "all"),
+                    (if (c.filter.size > 1) "Categories: " else "Category: ") + c.filter.summary(),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 360.dp),

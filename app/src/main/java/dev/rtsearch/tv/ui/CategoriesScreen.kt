@@ -20,6 +20,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -28,33 +29,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.tv.material3.Button
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import dev.rtsearch.tv.AppController
 import dev.rtsearch.tv.data.CategoryFilter
+import dev.rtsearch.tv.data.summary
 
 /**
  * Tracker categories on the left, forums of the current category on the right.
- * OK on a category searches the whole category; OK on a forum searches that forum and its subforums.
+ * OK toggles a whole category or a single forum (with its subforums); several can be selected.
+ * Apply (or Save for the default selection) confirms; Back leaves without changes.
  */
 @Composable
 fun CategoriesScreen(c: AppController, pickDefault: Boolean) {
     val categories = c.categories
-    val selected = if (pickDefault) c.defaultFilter else c.filter
-    // 0 is "All categories", followed by the categories in order.
+    // Index of the category whose forums are shown on the right.
     var current by remember { mutableIntStateOf(0) }
-    val initialFocus = remember { FocusRequester() }
+    val applyFocus = remember { FocusRequester() }
 
     LaunchedEffect(categories) {
         if (categories.isNotEmpty()) {
-            current = categories.indexOfFirst { it.ids == selected?.ids }.let { if (it >= 0) it + 1 else 0 }
-            runCatching { initialFocus.requestFocus() }
+            val firstSelected = categories.indexOfFirst { cat -> cat.forums.any { f -> c.draft.any { f.id in it.ids } } }
+            current = firstSelected.coerceAtLeast(0)
+            runCatching { applyFocus.requestFocus() }
         }
     }
 
     Column(Modifier.fillMaxSize().padding(horizontal = 40.dp, vertical = 24.dp)) {
-        Text(if (pickDefault) "Default category" else "Search category", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-        Text("Current: ${selected?.label ?: "all categories"}", color = Muted)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(Modifier.weight(1f)) {
+                Text(if (pickDefault) "Default categories" else "Search categories", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                Text("Selected: ${c.draft.summary()}", color = Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Button(onClick = { c.applyDraft() }, modifier = Modifier.focusRequester(applyFocus)) {
+                Text(if (pickDefault) "Save" else "Apply")
+            }
+            OutlinedButton(onClick = { c.clearDraft() }) { Text("Clear") }
+        }
         Spacer(Modifier.height(12.dp))
 
         val error = c.categoriesError
@@ -67,43 +80,39 @@ fun CategoriesScreen(c: AppController, pickDefault: Boolean) {
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    item {
-                        ListItem(
-                            selected = current == 0,
-                            onClick = { c.chooseCategory(null) },
-                            headlineContent = { Text("All categories") },
-                            modifier = Modifier
-                                .onFocusChanged { if (it.isFocused) current = 0 }
-                                .then(if (current == 0) Modifier.focusRequester(initialFocus) else Modifier),
-                        )
-                    }
                     itemsIndexed(categories) { index, category ->
-                        val pos = index + 1
+                        val selection = CategoryFilter(category.name, category.ids)
+                        val selectedForums = category.forums.count { f -> c.draft.any { f.id in it.ids } }
                         ListItem(
-                            selected = current == pos,
-                            onClick = { c.chooseCategory(CategoryFilter(category.name, category.ids)) },
+                            selected = c.isInDraft(selection),
+                            onClick = { c.toggleDraft(selection) },
                             headlineContent = { Text(category.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            supportingContent = { Text("${category.forums.size} forums") },
-                            modifier = Modifier
-                                .onFocusChanged { if (it.isFocused) current = pos }
-                                .then(if (selected?.ids == category.ids) Modifier.focusRequester(initialFocus) else Modifier),
+                            supportingContent = {
+                                Text(
+                                    when {
+                                        c.isInDraft(selection) -> "Whole category selected"
+                                        selectedForums > 0 -> "$selectedForums of ${category.forums.size} forums selected"
+                                        else -> "${category.forums.size} forums"
+                                    },
+                                )
+                            },
+                            modifier = Modifier.onFocusChanged { if (it.isFocused) current = index },
                         )
                     }
                 }
 
-                val category = categories.getOrNull(current - 1)
+                val category = categories.getOrNull(current)
                 LazyColumn(
                     modifier = Modifier.weight(1f).fillMaxHeight(),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                     contentPadding = PaddingValues(bottom = 24.dp),
                 ) {
-                    if (category == null) {
-                        item { Text("Search the whole tracker.", color = Muted) }
-                    } else {
+                    if (category != null) {
                         items(category.forums, key = { it.id }) { forum ->
+                            val selection = CategoryFilter(forum.name, forum.ids)
                             ListItem(
-                                selected = selected?.ids == forum.ids,
-                                onClick = { c.chooseCategory(CategoryFilter(forum.name, forum.ids)) },
+                                selected = c.isInDraft(selection),
+                                onClick = { c.toggleDraft(selection) },
                                 headlineContent = {
                                     Text(
                                         forum.name,

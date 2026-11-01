@@ -28,6 +28,7 @@ import androidx.tv.material3.Text
 import dev.rtsearch.tv.AppController
 import dev.rtsearch.tv.MIRRORS
 import dev.rtsearch.tv.UpdateState
+import dev.rtsearch.tv.data.summary
 
 @Composable
 fun SettingsScreen(c: AppController) {
@@ -107,14 +108,14 @@ fun SettingsScreen(c: AppController) {
             }
 
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SectionTitle("Default category")
-                Text("The search starts with this category every time the app opens.", color = Muted)
+                SectionTitle("Default categories")
+                Text("The search starts with these categories every time the app opens.", color = Muted)
                 OutlinedButton(
                     onClick = { c.openCategories(pickDefault = true) },
                     modifier = Modifier.focusRequester(categoryFocus),
                 ) {
                     Text(
-                        c.defaultFilter?.label ?: "All categories",
+                        c.defaultFilter.summary(),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 420.dp),

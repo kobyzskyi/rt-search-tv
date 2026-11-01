@@ -23,8 +23,9 @@ class Rutracker(private val web: WebBridge) {
     var categories: List<ForumCategory> = emptyList()
         private set
 
-    suspend fun search(query: String, sort: SortOrder, filter: CategoryFilter?): SearchPage {
-        val forums = filter?.ids.orEmpty().joinToString("") { "&f%5B%5D=$it" }
+    /** [forumIds] narrows the search to these forums; empty means the whole tracker. */
+    suspend fun search(query: String, sort: SortOrder, forumIds: Collection<String>): SearchPage {
+        val forums = forumIds.joinToString("") { "&f%5B%5D=$it" }
         val url = web.base + "tracker.php?nm=" + cp1251(query) + "&o=${sort.param}&s=2" + forums
         return searchUrl(url)
     }

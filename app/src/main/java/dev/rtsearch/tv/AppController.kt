@@ -17,6 +17,9 @@ import dev.rtsearch.tv.data.Rutracker
 import dev.rtsearch.tv.data.SortOrder
 import dev.rtsearch.tv.data.TopicDetails
 import dev.rtsearch.tv.data.TorrentItem
+import dev.rtsearch.tv.data.forumIds
+import org.json.JSONArray
+import org.json.JSONObject
 import dev.rtsearch.tv.update.Release
 import dev.rtsearch.tv.update.Updater
 import dev.rtsearch.tv.web.ChallengeCancelledException
@@ -34,7 +37,7 @@ sealed interface Screen {
     data class Topic(val item: TorrentItem) : Screen
     data object Settings : Screen
 
-    /** [pickDefault] chooses the default category in Settings instead of the current search filter. */
+    /** [pickDefault] edits the default categories from Settings instead of the current search filter. */
     data class Categories(val pickDefault: Boolean) : Screen
 }
 
@@ -87,10 +90,14 @@ class AppController(
         private set
     val listState = LazyListState()
 
-    // Category filter: the search starts with the default category from Settings.
+    // Category filter: several categories or forums at once; empty means the whole tracker.
+    // The search starts with the default selection from Settings.
     var defaultFilter by mutableStateOf(loadFilter())
         private set
     var filter by mutableStateOf(defaultFilter)
+        private set
+    /** The selection being edited on the categories screen until Apply or Save. */
+    var draft by mutableStateOf<List<CategoryFilter>>(emptyList())
         private set
     var categories by mutableStateOf<List<ForumCategory>>(emptyList())
         private set
@@ -142,7 +149,7 @@ class AppController(
             searching = true
             searchError = null
             try {
-                val page = repo.search(q, sort, filter)
+                val page = repo.search(q, sort, filter.forumIds())
                 results = page.items
                 total = page.total
                 nextUrl = page.nextUrl
@@ -164,6 +171,7 @@ class AppController(
     }
 
     fun openCategories(pickDefault: Boolean = false) {
+        draft = if (pickDefault) defaultFilter else filter
         screen = Screen.Categories(pickDefault)
         if (categories.isNotEmpty()) return
         categoriesError = null
@@ -176,20 +184,28 @@ class AppController(
         }
     }
 
-    /** Applies a category picked on the categories screen; null means all categories. */
-    fun chooseCategory(newFilter: CategoryFilter?) {
+    fun isInDraft(selection: CategoryFilter): Boolean = draft.any { it.ids == selection.ids }
+
+    fun toggleDraft(selection: CategoryFilter) {
+        draft = if (isInDraft(selection)) draft.filterNot { it.ids == selection.ids } else draft + selection
+    }
+
+    fun clearDraft() {
+        draft = emptyList()
+    }
+
+    /** Applies the edited selection: as the default (Settings) or as the current search filter. */
+    fun applyDraft() {
         if ((screen as? Screen.Categories)?.pickDefault == true) {
-            defaultFilter = newFilter
-            prefs.edit()
-                .putString("filter_label", newFilter?.label)
-                .putString("filter_ids", newFilter?.ids?.joinToString(","))
-                .apply()
+            defaultFilter = draft
+            prefs.edit().putString("filters", saveFilter(draft)).apply()
             screen = Screen.Settings
             return
         }
-        filter = newFilter
+        val changed = filter != draft
+        filter = draft
         screen = Screen.Search
-        if (searchedOnce) search()
+        if (changed && searchedOnce) search()
     }
 
     fun loadMore() {
@@ -399,11 +415,26 @@ class AppController(
 
     private fun toast(text: String) = Toast.makeText(context, text, Toast.LENGTH_LONG).show()
 
-    private fun loadFilter(): CategoryFilter? {
-        val label = prefs.getString("filter_label", null) ?: return null
-        val ids = prefs.getString("filter_ids", "").orEmpty().split(',').filter { it.isNotBlank() }
-        return if (ids.isEmpty()) null else CategoryFilter(label, ids)
+    private fun loadFilter(): List<CategoryFilter> {
+        val json = prefs.getString("filters", null)
+        if (json == null) {
+            // Version 1.0.0 stored a single default category.
+            val label = prefs.getString("filter_label", null) ?: return emptyList()
+            val ids = prefs.getString("filter_ids", "").orEmpty().split(',').filter { it.isNotBlank() }
+            return if (ids.isEmpty()) emptyList() else listOf(CategoryFilter(label, ids))
+        }
+        return runCatching {
+            val array = JSONArray(json)
+            (0 until array.length()).map { i ->
+                val item = array.getJSONObject(i)
+                val ids = item.getJSONArray("ids")
+                CategoryFilter(item.getString("label"), (0 until ids.length()).map { ids.getString(it) })
+            }
+        }.getOrDefault(emptyList())
     }
+
+    private fun saveFilter(filters: List<CategoryFilter>): String =
+        JSONArray(filters.map { JSONObject().put("label", it.label).put("ids", JSONArray(it.ids)) }).toString()
 
     private fun loadHistory(): List<String> =
         prefs.getString("history", "").orEmpty().split('\n').filter { it.isNotBlank() }

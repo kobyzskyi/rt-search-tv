@@ -45,5 +45,15 @@ data class ForumCategory(val name: String, val forums: List<Forum>) {
     val ids: List<String> get() = forums.map { it.id }
 }
 
-/** The selected filter: a label for the button and forum ids for tracker.php (f[]=...). */
+/** One selected category or forum: a label for the UI and its forum ids for tracker.php (f[]=...). */
 data class CategoryFilter(val label: String, val ids: List<String>)
+
+/** A short description of a multi-selection for buttons. */
+fun List<CategoryFilter>.summary(): String = when (size) {
+    0 -> "All categories"
+    1 -> first().label
+    else -> "$size categories"
+}
+
+/** Forum ids to search in; overlapping selections are merged. */
+fun List<CategoryFilter>.forumIds(): Set<String> = flatMapTo(linkedSetOf()) { it.ids }
