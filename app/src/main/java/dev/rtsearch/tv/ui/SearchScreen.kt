@@ -104,7 +104,11 @@ fun SearchScreen(c: AppController) {
             Spacer(Modifier.width(16.dp))
             OutlinedButton(onClick = { c.openCategories() }) {
                 Text(
-                    (if (c.filter.size > 1) "Categories: " else "Category: ") + c.filter.summary(),
+                    when (c.filter.size) {
+                        0 -> "Category: all"
+                        1 -> "Category: " + c.filter.summary()
+                        else -> "Categories: " + c.filter.size
+                    },
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.widthIn(max = 360.dp),
