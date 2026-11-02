@@ -347,16 +347,14 @@ class AppController(
 
     fun installUpdate() {
         val release = (update as? UpdateState.Available)?.release ?: return
-        if (!updater.canInstall()) {
-            toast("Allow this app to install unknown apps, then press Install again")
-            if (!updater.openInstallPermissionSettings()) update = UpdateState.Failed("Installing apps is not allowed")
-            return
-        }
         updateJob = scope.launch {
             update = UpdateState.Downloading(release, 0f)
             try {
                 val apk = updater.download(release) { p -> update = UpdateState.Downloading(release, p) }
                 update = UpdateState.Available(release)
+                // The system installer asks for the "Install unknown apps" permission itself when it is missing
+                // and continues afterwards; some TVs open only a generic app list from our own settings link.
+                if (!updater.canInstall()) toast("If Android asks, allow RT Search to install apps")
                 updater.install(apk)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

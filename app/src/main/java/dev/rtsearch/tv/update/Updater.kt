@@ -2,9 +2,7 @@ package dev.rtsearch.tv.update
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
-import android.provider.Settings
 import androidx.core.content.FileProvider
 import dev.rtsearch.tv.BuildConfig
 import kotlinx.coroutines.Dispatchers
@@ -87,14 +85,6 @@ class Updater(private val context: Context) {
     /** Whether Android allows this app to install packages ("Install unknown apps"). */
     fun canInstall(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
-
-    /** Opens the system screen where the user allows this app to install updates. */
-    fun openInstallPermissionSettings(): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
-        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${context.packageName}"))
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        return runCatching { context.startActivity(intent) }.isSuccess
-    }
 
     /** Hands the APK over to the system package installer. */
     fun install(apk: File) {
