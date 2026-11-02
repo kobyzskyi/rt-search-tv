@@ -28,7 +28,7 @@ The app does not try to get around the check; the user passes it in a real brows
 
 ## Updates
 
-On start-up (at most every 6 hours, can be turned off in Settings) the app asks the GitHub API for the latest
+On every start (can be turned off in Settings) the app asks the GitHub API for the latest
 release of this repository. If its version is newer than the installed one, a banner offers to install it: the
 APK is downloaded and handed to the system installer. Android asks once to allow installing unknown apps
 from RT Search.

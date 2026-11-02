@@ -26,8 +26,8 @@ android {
         applicationId = "dev.rtsearch.tv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.0.3"
 
         buildConfigField("String", "GITHUB_REPO", "\"kobyzskyi/rt-search-tv\"")
     }

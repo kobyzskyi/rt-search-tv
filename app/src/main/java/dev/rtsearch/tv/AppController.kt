@@ -314,10 +314,12 @@ class AppController(
         prefs.edit().putString("host", newHost).apply()
     }
 
-    /** Checks GitHub on start-up at most every few hours when automatic updates are on. */
+    /**
+     * Checks GitHub on every start when automatic updates are on. A TV may kill the app while the user is in
+     * system settings, so the offer has to come back on the next start rather than hours later.
+     */
     fun checkForUpdatesOnStart() {
-        val last = prefs.getLong("update_checked_at", 0)
-        if (autoUpdate && System.currentTimeMillis() - last > UPDATE_CHECK_INTERVAL_MS) checkForUpdates(silent = true)
+        if (autoUpdate) checkForUpdates(silent = true)
     }
 
     fun checkForUpdates(silent: Boolean = false) {
@@ -326,7 +328,6 @@ class AppController(
             update = UpdateState.Checking
             update = try {
                 val release = updater.latestRelease()
-                prefs.edit().putLong("update_checked_at", System.currentTimeMillis()).apply()
                 if (release != null && updater.isNewer(release)) UpdateState.Available(release) else UpdateState.UpToDate
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -443,8 +444,6 @@ class AppController(
     }
 
     companion object {
-        private const val UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000L
-
         fun savedHost(context: Context): String =
             context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 .getString("host", MIRRORS.first())!!
