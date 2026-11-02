@@ -2,7 +2,14 @@ package dev.rtsearch.tv.ui
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -27,7 +34,12 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 
-/** A text field with a clearly visible focus border for remote control navigation. */
+/**
+ * A text field with a clearly visible focus border for remote control navigation.
+ *
+ * Moving focus onto the field only highlights it; the on-screen keyboard opens when the user presses OK.
+ * Otherwise every D-pad pass over a field would pop the keyboard up.
+ */
 @Composable
 fun TvTextField(
     value: String,
@@ -39,7 +51,40 @@ fun TvTextField(
     onAction: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    val input = remember { FocusRequester() }
     val shape = RoundedCornerShape(10.dp)
+
+    LaunchedEffect(editing) {
+        if (editing) runCatching { input.requestFocus() }
+    }
+
+    // The outer box takes D-pad focus; OK on it hands focus to the real text field, which shows the keyboard.
+    Box(
+        modifier
+            .onFocusChanged {
+                focused = it.hasFocus
+                if (!it.hasFocus) editing = false
+            }
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { editing = true },
+    ) {
+        TextInput(value, onValueChange, placeholder, password, imeAction, onAction, focused, shape, input, editing)
+    }
+}
+
+@Composable
+private fun TextInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    password: Boolean,
+    imeAction: ImeAction,
+    onAction: () -> Unit,
+    focused: Boolean,
+    shape: RoundedCornerShape,
+    input: FocusRequester,
+    editing: Boolean,
+) {
     BasicTextField(
         value = value,
         onValueChange = onValueChange,
@@ -52,7 +97,10 @@ fun TvTextField(
             imeAction = imeAction,
         ),
         keyboardActions = KeyboardActions(onAny = { onAction() }),
-        modifier = modifier.onFocusChanged { focused = it.isFocused },
+        modifier = Modifier
+            .fillMaxWidth()
+            .focusRequester(input)
+            .focusProperties { canFocus = editing },
         decorationBox = { inner ->
             Box(
                 Modifier

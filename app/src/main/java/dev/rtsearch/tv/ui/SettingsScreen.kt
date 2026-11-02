@@ -28,7 +28,7 @@ import androidx.tv.material3.Text
 import dev.rtsearch.tv.AppController
 import dev.rtsearch.tv.MIRRORS
 import dev.rtsearch.tv.UpdateState
-import dev.rtsearch.tv.data.summary
+import dev.rtsearch.tv.data.CategoryFilter
 
 @Composable
 fun SettingsScreen(c: AppController) {
@@ -38,6 +38,9 @@ fun SettingsScreen(c: AppController) {
     val categoryFocus = remember { FocusRequester() }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
+    // Signed-in users see the credential fields only after asking to switch accounts.
+    var switching by remember { mutableStateOf(false) }
+    val showForm = !c.isLoggedIn || switching
 
     LaunchedEffect(Unit) {
         // Signed-out users came here to sign in; others most likely want the settings below.
@@ -53,13 +56,15 @@ fun SettingsScreen(c: AppController) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SectionTitle("Tracker account")
                 Text(
-                    if (c.isLoggedIn) {
-                        "You are signed in. You can switch accounts or sign out."
-                    } else {
-                        "Search and downloads are available to registered users only."
-                    },
+                    if (c.isLoggedIn) "You are signed in." else "Search and downloads are available to registered users only.",
                     color = Muted,
                 )
+                if (!showForm) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(onClick = { switching = true }) { Text("Switch account") }
+                        OutlinedButton(onClick = { c.logout() }) { Text("Sign out") }
+                    }
+                } else {
                 TvTextField(
                     value = user,
                     onValueChange = { user = it },
@@ -87,7 +92,8 @@ fun SettingsScreen(c: AppController) {
                         c.login(user, pass)
                     }) { Text(if (c.loginBusy) "Signing in..." else "Sign in") }
                     OutlinedButton(onClick = { c.loginInBrowser() }) { Text("Sign in on the website") }
-                    if (c.isLoggedIn) OutlinedButton(onClick = { c.logout() }) { Text("Sign out") }
+                    if (c.isLoggedIn) OutlinedButton(onClick = { switching = false }) { Text("Cancel") }
+                }
                 }
 
                 SectionTitle("Site address", Modifier.padding(top = 12.dp))
@@ -115,12 +121,13 @@ fun SettingsScreen(c: AppController) {
                     modifier = Modifier.focusRequester(categoryFocus),
                 ) {
                     Text(
-                        c.defaultFilter.summary(),
+                        if (c.defaultFilter.isEmpty()) "All categories" else "Change",
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.widthIn(max = 420.dp),
                     )
                 }
+                DefaultCategoriesPreview(c.defaultFilter)
 
                 SectionTitle("Updates", Modifier.padding(top = 12.dp))
                 Text("Installed version: ${c.currentVersion}", color = Muted)
@@ -150,6 +157,20 @@ private fun UpdateStatus(c: AppController) {
         is UpdateState.Failed -> Text("Update check failed: ${u.message}", color = LeechColor)
     }
 }
+
+/** Lists the selected default categories so they are visible without opening the picker. */
+@Composable
+private fun DefaultCategoriesPreview(filters: List<CategoryFilter>) {
+    if (filters.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        filters.take(PREVIEW_LIMIT).forEach {
+            Text("• " + it.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (filters.size > PREVIEW_LIMIT) Text("and ${filters.size - PREVIEW_LIMIT} more", color = Muted)
+    }
+}
+
+private const val PREVIEW_LIMIT = 5
 
 @Composable
 private fun SectionTitle(text: String, modifier: Modifier = Modifier) {

@@ -121,7 +121,9 @@ class AppController(
         private set
     var loginError by mutableStateOf<String?>(null)
         private set
-    val isLoggedIn: Boolean get() = repo.isLoggedIn
+    /** Whether the tracker session cookie is present; refreshed after signing in or out. */
+    var isLoggedIn by mutableStateOf(repo.isLoggedIn)
+        private set
     val siteReferer: String get() = web.base
 
     // Updates
@@ -304,6 +306,7 @@ class AppController(
 
     fun logout() {
         repo.logout()
+        isLoggedIn = false
         toast("Signed out")
         screen = Screen.Settings
     }
@@ -371,6 +374,7 @@ class AppController(
             loginError = null
             try {
                 val error = block()
+                isLoggedIn = repo.isLoggedIn
                 if (error == null) {
                     toast("Signed in")
                     screen = returnTo
@@ -391,6 +395,7 @@ class AppController(
     private fun handle(e: Exception, retry: () -> Unit): String {
         if (e is CancellationException) throw e
         if (e is NeedLoginException) {
+            isLoggedIn = false
             afterLogin = retry
             openSettings()
         }
