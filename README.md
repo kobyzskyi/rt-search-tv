@@ -44,8 +44,12 @@ The APK is written to `app/build/outputs/apk/debug/app-debug.apk`. Install it ov
 
 ```bash
 adb connect <tv-ip>:5555
-adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb install -r --user 0 app/build/outputs/apk/debug/app-debug.apk
 ```
+
+Without `--user 0`, adb installs the app into every user and profile on the device. Many TVs have hidden
+service profiles, and the "Install unknown apps" list then shows several RT Search entries (the extra ones carry
+a briefcase badge); updates only work when the entry of the main user is allowed.
 
 ## Releases
 
