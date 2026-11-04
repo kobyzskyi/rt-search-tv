@@ -75,6 +75,7 @@ fun App(controller: AppController, web: WebBridge, webView: WebView) {
                         Screen.Search -> SearchScreen(controller)
                         is Screen.Topic -> TopicScreen(controller, screen.item)
                         Screen.Settings -> SettingsScreen(controller)
+                        Screen.Library -> LibraryScreen(controller)
                         is Screen.Categories -> CategoriesScreen(controller, screen.pickDefault)
                     }
                 }

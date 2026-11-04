@@ -12,8 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.FileProvider
 import dev.rtsearch.tv.data.CategoryFilter
 import dev.rtsearch.tv.data.ForumCategory
+import dev.rtsearch.tv.data.Library
 import dev.rtsearch.tv.data.NeedLoginException
 import dev.rtsearch.tv.data.Rutracker
+import dev.rtsearch.tv.data.SavedTorrent
 import dev.rtsearch.tv.data.SortOrder
 import dev.rtsearch.tv.data.TopicDetails
 import dev.rtsearch.tv.data.TorrentItem
@@ -36,6 +38,7 @@ sealed interface Screen {
     data object Search : Screen
     data class Topic(val item: TorrentItem) : Screen
     data object Settings : Screen
+    data object Library : Screen
 
     /** [pickDefault] edits the default categories from Settings instead of the current search filter. */
     data class Categories(val pickDefault: Boolean) : Screen
@@ -50,6 +53,11 @@ sealed interface UpdateState {
     data class Failed(val message: String) : UpdateState
 }
 
+enum class LibraryTab(val label: String) {
+    FAVORITES("Favorites"),
+    HISTORY("History"),
+}
+
 val MIRRORS = listOf("rutracker.org", "rutracker.net", "rutracker.nl")
 
 class AppController(
@@ -60,6 +68,7 @@ class AppController(
     private val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val repo = Rutracker(web)
     private val updater = Updater(context)
+    private val library = Library(context)
 
     var screen by mutableStateOf<Screen>(Screen.Search)
         private set
@@ -113,6 +122,19 @@ class AppController(
         private set
     var busy by mutableStateOf(false)
         private set
+
+    // Favorites and recently opened releases, newest first
+    var favorites by mutableStateOf(library.loadFavorites())
+        private set
+    var viewed by mutableStateOf(library.loadHistory())
+        private set
+    var libraryTab by mutableStateOf(LibraryTab.FAVORITES)
+        private set
+    /** Index of the last release opened from the library, to restore focus on it. */
+    var libraryIndex by mutableStateOf(-1)
+        private set
+    /** Where Back leads from a release: the search results or the library. */
+    private var topicReturn: Screen = Screen.Search
 
     // Sign-in
     var host by mutableStateOf(web.host)
@@ -229,6 +251,54 @@ class AppController(
 
     fun openTopic(item: TorrentItem, index: Int) {
         lastOpenedIndex = index
+        showTopic(item, Screen.Search)
+    }
+
+    fun openLibrary(tab: LibraryTab? = null) {
+        if (tab != null && tab != libraryTab) {
+            libraryTab = tab
+            libraryIndex = -1
+        }
+        screen = Screen.Library
+    }
+
+    fun changeLibraryTab(tab: LibraryTab) {
+        if (tab == libraryTab) return
+        libraryTab = tab
+        libraryIndex = -1
+    }
+
+    /** Opens a release from the current library tab. */
+    fun openSaved(item: TorrentItem, index: Int) {
+        libraryIndex = index
+        showTopic(item, Screen.Library)
+    }
+
+    fun isFavorite(id: String): Boolean = favorites.any { it.item.id == id }
+
+    fun toggleFavorite(item: TorrentItem) {
+        favorites = if (isFavorite(item.id)) {
+            favorites.filterNot { it.item.id == item.id }
+        } else {
+            listOf(SavedTorrent(item, System.currentTimeMillis())) + favorites
+        }
+        library.saveFavorites(favorites)
+    }
+
+    fun removeViewed(id: String) {
+        viewed = viewed.filterNot { it.item.id == id }
+        library.saveHistory(viewed)
+    }
+
+    fun clearViewed() {
+        viewed = emptyList()
+        libraryIndex = -1
+        library.saveHistory(viewed)
+    }
+
+    private fun showTopic(item: TorrentItem, from: Screen) {
+        topicReturn = from
+        rememberViewed(item)
         screen = Screen.Topic(item)
         topic = null
         topicError = null
@@ -237,11 +307,23 @@ class AppController(
             try {
                 topic = repo.topic(item.id)
             } catch (e: Exception) {
-                topicError = handle(e) { openTopic(item, index) }
+                topicError = handle(e) { showTopic(item, from) }
             } finally {
                 topicLoading = false
             }
         }
+    }
+
+    /** Moves the release to the top of the history. Opening it from the history keeps the list order stable. */
+    private fun rememberViewed(item: TorrentItem) {
+        val entry = SavedTorrent(item, System.currentTimeMillis())
+        val index = viewed.indexOfFirst { it.item.id == item.id }
+        viewed = if (screen == Screen.Library && libraryTab == LibraryTab.HISTORY && index >= 0) {
+            viewed.toMutableList().also { it[index] = entry }
+        } else {
+            (listOf(entry) + viewed.filterNot { it.item.id == item.id }).take(HISTORY_LIMIT)
+        }
+        library.saveHistory(viewed)
     }
 
     fun openMagnet() {
@@ -277,7 +359,8 @@ class AppController(
 
     fun back(): Boolean {
         when (screen) {
-            is Screen.Topic -> screen = Screen.Search
+            is Screen.Topic -> screen = topicReturn
+            Screen.Library -> screen = Screen.Search
             is Screen.Categories -> screen = if ((screen as Screen.Categories).pickDefault) Screen.Settings else Screen.Search
             Screen.Settings -> {
                 afterLogin = null
@@ -449,6 +532,8 @@ class AppController(
     }
 
     companion object {
+        private const val HISTORY_LIMIT = 100
+
         fun savedHost(context: Context): String =
             context.getSharedPreferences("settings", Context.MODE_PRIVATE)
                 .getString("host", MIRRORS.first())!!

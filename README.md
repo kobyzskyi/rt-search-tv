@@ -22,6 +22,8 @@ The app does not try to get around the check; the user passes it in a real brows
 * Category filter: a whole tracker category or a single forum with its subforums. A default category can be
   set in Settings and is applied every time the app starts.
 * Release page: poster, size, seeds and leeches, scrollable description, "Open magnet" and "Download .torrent".
+* Library: favorite releases ("Add to favorites" on the release page) and the history of the last 100 opened
+  releases. Holding OK on an entry removes it from the list.
 * Sign-in with username and password, or on the website when the tracker asks for a captcha.
 * Mirror selection: rutracker.org, rutracker.net, rutracker.nl.
 * Automatic updates from GitHub releases (see below).
@@ -76,5 +78,6 @@ signed with the same key, otherwise Android refuses to install it over the previ
 * `data/Rutracker.kt`: search (`tracker.php`), releases (`viewtopic.php`), sign-in, `.torrent` downloads
   (`dl.php`), HTML parsing with Jsoup (windows-1251).
 * `update/Updater.kt`: GitHub release check, APK download and installation.
-* `AppController.kt`: screen state, search history, settings, launching the torrent client.
-* `ui/`: search, release, categories and settings screens built for remote control navigation.
+* `data/Library.kt`: favorites and the history of opened releases, stored as JSON in SharedPreferences.
+* `AppController.kt`: screen state, search history, favorites, settings, launching the torrent client.
+* `ui/`: search, release, library, categories and settings screens built for remote control navigation.

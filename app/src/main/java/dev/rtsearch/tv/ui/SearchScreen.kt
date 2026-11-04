@@ -89,6 +89,7 @@ fun SearchScreen(c: AppController) {
                 modifier = Modifier.weight(1f).focusRequester(fieldFocus),
             )
             Button(onClick = { submit() }) { Text("Search") }
+            OutlinedButton(onClick = { c.openLibrary() }) { Text("Library") }
             OutlinedButton(onClick = { c.openSettings() }) { Text(if (c.isLoggedIn) "Settings" else "Sign in") }
         }
         Spacer(Modifier.height(12.dp))
@@ -151,7 +152,7 @@ fun SearchScreen(c: AppController) {
                         0 -> Modifier.focusRequester(firstItemFocus)
                         else -> Modifier
                     }
-                    ResultRow(item, mod) { c.openTopic(item, index) }
+                    ResultRow(item, c.isFavorite(item.id), mod) { c.openTopic(item, index) }
                 }
                 if (c.nextUrl != null) {
                     item {
@@ -190,18 +191,32 @@ private fun UpdateBanner(c: AppController) {
     }
 }
 
+/** A release in a list; [details] replaces the forum, size and date line (the library adds when it was opened). */
 @Composable
-private fun ResultRow(item: TorrentItem, modifier: Modifier, onClick: () -> Unit) {
+fun ResultRow(
+    item: TorrentItem,
+    favorite: Boolean,
+    modifier: Modifier,
+    details: String = listOf(item.forum, item.size, item.date).filter { it.isNotEmpty() }.joinToString("  •  "),
+    onLongClick: (() -> Unit)? = null,
+    onClick: () -> Unit,
+) {
     ListItem(
         selected = false,
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier.fillMaxWidth(),
         headlineContent = {
-            Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis, fontSize = 17.sp)
+            Text(
+                if (favorite) "★ " + item.title else item.title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                fontSize = 17.sp,
+            )
         },
         supportingContent = {
             Text(
-                listOf(item.forum, item.size, item.date).filter { it.isNotEmpty() }.joinToString("  •  "),
+                details,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

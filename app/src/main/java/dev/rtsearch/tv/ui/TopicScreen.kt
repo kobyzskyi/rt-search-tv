@@ -89,10 +89,12 @@ fun TopicScreen(c: AppController, item: TorrentItem) {
                                 modifier = if (topic.magnet == null) first else Modifier,
                             ) { Text(if (c.busy) "Downloading..." else "Download .torrent") }
                         }
+                        val favorite = c.isFavorite(item.id)
                         OutlinedButton(
-                            onClick = { c.back() },
+                            onClick = { c.toggleFavorite(item.copy(title = topic.title.ifEmpty { item.title })) },
                             modifier = if (topic.magnet == null && !topic.hasTorrentFile) first else Modifier,
-                        ) { Text("Back") }
+                        ) { Text(if (favorite) "★ In favorites" else "☆ Add to favorites") }
+                        OutlinedButton(onClick = { c.back() }) { Text("Back") }
                     }
                     Description(topic.description)
                 }
